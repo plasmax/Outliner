@@ -81,6 +81,26 @@ public:
     add_draw_handle(ctx);
 
     }
+  
+  void highlight_geometry() {
+    if (ctx->viewer_mode() != VIEWER_2D && !node_disabled()) {
+      if (ctx->connected() >= SHOW_OBJECT) {
+        validate(false);
+        add_draw_geometry(myctx); // draw wireframes
+        // ctx->connected(CONNECTED); // do not pass through objects
+        }
+      }
+
+    for (int i = 0; i <= inputs(); i++) {
+      if (!node_input(i, Op::OUTPUT_OP) == NULL) {
+        add_input_handle(i, myctx); // calls build_handles on input ops
+      }
+    }
+
+    build_knob_handles(myctx);
+
+    add_draw_handle(myctx);
+    }
 };
 
 static Op* build(Node *node) {
