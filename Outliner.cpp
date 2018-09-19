@@ -68,13 +68,14 @@ public:
   }
 
   void build_handles(ViewerContext* ctx) {
-    // std::cout << "Building handles..." << std::endl;
     if (ctx->transform_mode() == VIEWER_2D) return;
     if (ctx->viewer_mode() != VIEWER_2D && !node_disabled()) {
       if (ctx->connected() >= SHOW_OBJECT) {
         validate(false);
+
         // construct output geometry and add callbacks to draw it in the viewer.
         add_draw_geometry(ctx);
+
         // ctx->connected(CONNECTED); // do not pass through objects
         }
       }
@@ -97,6 +98,8 @@ public:
     }
 
 
+  // Not used but potentially very useful
+  // (perhaps a more constant ID would be better)
   void select_by_hash(Hash& hash) {
     GeometryList& out = *scene_->object_list();
     for (unsigned o = 0; o <= out.size(); o++) {
