@@ -83,6 +83,17 @@ class GlueKnob : public Knob
 
 public:
   void draw_handle(ViewerContext* ctx) {
+    // std::cout << "drawHandleTypes" << drawHandleTypes() << std::endl; // 16
+    // std::cout << "eDrawHandleAlways: " << eDrawHandleAlways << std::endl;
+    // std::cout << "eDrawHandleVertexSelection: " << eDrawHandleVertexSelection << std::endl;
+    // std::cout << "eDrawHandleEdgeSelection: " << eDrawHandleEdgeSelection << std::endl;
+    // std::cout << "eDrawHandleFaceSelection: " << eDrawHandleFaceSelection << std::endl;
+    // std::cout << "eDrawHandleObjectSelection: " << eDrawHandleObjectSelection << std::endl;
+    // std::cout << "eDrawHandleNodeSelection: " << eDrawHandleNodeSelection << std::endl;
+    // std::cout << "drawHandleTypes: " << drawHandleTypes() << std::endl;
+    // setDrawHandleTypes(eDrawHandleObjectSelection);
+    // // setDrawHandleTypes(eDrawHandleObjectSelection | eDrawHandleEdgeSelection | eDrawHandleVertexSelection | eDrawHandleFaceSelection);
+    // std::cout << (eDrawHandleObjectSelection | eDrawHandleEdgeSelection | eDrawHandleVertexSelection | eDrawHandleFaceSelection) << std::endl;
     begin_handle(Knob::ANYWHERE_MOUSEMOVES, ctx, handle_cb, 0 /*index*/, 0, 0, 0 /*xyz*/);
     // begin_handle(Knob::ANYWHERE, ctx, handle_cb, 0 /*index*/, 0, 0, 0 /*xyz*/);
     end_handle(ctx);
@@ -168,11 +179,13 @@ int Outliner::knob_changed(Knob* k) {
 void Outliner::_validate(bool for_real) {
   update_geometry_hashes();
   for (int i = 0; i < inputs(); i++) {
-    GeoOp* op = dynamic_cast<GeoOp*>(input(i));
-    if (op) {
-      op->validate(for_real);
+    if (node_input(i, Op::OUTPUT_OP) != NULL) {
+      GeoOp* op = dynamic_cast<GeoOp*>(input(i));
+      if (op) {
+        op->validate(for_real);
+        }
       }
-    }
+  }
   GeoOp::_validate(for_real);
   }
 
@@ -225,7 +238,7 @@ void Outliner::geometry_engine(Scene& scene, GeometryList& out) {
     if (dynamic_cast<GeoOp*>(input(i))){
       GeoOp* op = input(i);
       op->get_geometry(scene, out);
-      op->print_info(std::cout); // test
+      // op->print_info(std::cout); // test
 
     }
   }
@@ -236,7 +249,7 @@ void Outliner::geometry_engine(Scene& scene, GeometryList& out) {
   for (unsigned o = 0; o < out.size(); o++) {
     GeoInfo& info = out[o];
     info.matrix = _local * info.matrix;
-    info.print_info(std::cout); // test
+    // info.print_info(std::cout); // test
   }
 
 }
@@ -435,6 +448,14 @@ bool Outliner::draw_indicators(ViewerContext* ctx) {
   if (!_select_from_viewport) {
     select_geo_from_table(ctx);
   }
+
+
+  /*
+  DrawHandleType {
+    eDrawHandleAlways, eDrawHandleVertexSelection, eDrawHandleEdgeSelection, eDrawHandleFaceSelection,
+    eDrawHandleObjectSelection, eDrawHandleNodeSelection
+  }
+  */
 
   if (_select_from_viewport) {
     select_table_from_geo(ctx);
