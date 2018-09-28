@@ -63,7 +63,7 @@ public:
 
   void init_table();
   void select_geo_from_table(ViewerContext* ctx);
-  void select_table_from_geo(ViewerContext* ctx);
+  void select_table_from_viewport(ViewerContext* ctx);
   bool draw_indicators(ViewerContext* ctx);
   bool set_selection_zone(ViewerContext* ctx);
   void print_event_type(ViewerContext* ctx);
@@ -83,17 +83,6 @@ class GlueKnob : public Knob
 
 public:
   void draw_handle(ViewerContext* ctx) {
-    // std::cout << "drawHandleTypes" << drawHandleTypes() << std::endl; // 16
-    // std::cout << "eDrawHandleAlways: " << eDrawHandleAlways << std::endl;
-    // std::cout << "eDrawHandleVertexSelection: " << eDrawHandleVertexSelection << std::endl;
-    // std::cout << "eDrawHandleEdgeSelection: " << eDrawHandleEdgeSelection << std::endl;
-    // std::cout << "eDrawHandleFaceSelection: " << eDrawHandleFaceSelection << std::endl;
-    // std::cout << "eDrawHandleObjectSelection: " << eDrawHandleObjectSelection << std::endl;
-    // std::cout << "eDrawHandleNodeSelection: " << eDrawHandleNodeSelection << std::endl;
-    // std::cout << "drawHandleTypes: " << drawHandleTypes() << std::endl;
-    // setDrawHandleTypes(eDrawHandleObjectSelection);
-    // // setDrawHandleTypes(eDrawHandleObjectSelection | eDrawHandleEdgeSelection | eDrawHandleVertexSelection | eDrawHandleFaceSelection);
-    // std::cout << (eDrawHandleObjectSelection | eDrawHandleEdgeSelection | eDrawHandleVertexSelection | eDrawHandleFaceSelection) << std::endl;
     begin_handle(Knob::ANYWHERE_MOUSEMOVES, ctx, handle_cb, 0 /*index*/, 0, 0, 0 /*xyz*/);
     // begin_handle(Knob::ANYWHERE, ctx, handle_cb, 0 /*index*/, 0, 0, 0 /*xyz*/);
     end_handle(ctx);
@@ -137,6 +126,8 @@ void Outliner::knobs(Knob_Callback f) {
   GeoOp::knobs(f);
 
   Knob* tableKnob = Table_knob(f, "Table_knob");
+  SetFlags(f, Knob::KNOB_CHANGED_ALWAYS);
+  SetFlags(f, Knob::NODE_KNOB);
   if (f.makeKnobs()) {
     Table_KnobI* tableKnobI = tableKnob->tableKnob();
     tableKnobI->addColumn("src_id", "src_id", Table_KnobI::FloatColumn, false);
@@ -146,12 +137,15 @@ void Outliner::knobs(Knob_Callback f) {
 
   Axis_knob(f, &_local, "Axis_knob");
   Bool_knob(f, &_select_from_viewport, "In_Viewer");
-  SetFlags(f, Knob::ALWAYS_SAVE);
+  SetFlags(f, Knob::MODIFIES_GEOMETRY);
+  SetFlags(f, Knob::DO_NOT_WRITE);
+  SetFlags(f, Knob::NO_UNDO);
   SetFlags(f, Knob::INVISIBLE);
 }
 
 
 int Outliner::knob_changed(Knob* k) {
+  std::cout << k->name() << " changed" << std::endl;
   if (k->name() == "inputChange") {
     _table_initialized = false;
     return 1;
@@ -196,6 +190,10 @@ void Outliner::get_geometry_hash() {
   geo_hash[Group_Points].append(Op::hash());
 
 
+  // could selection status (a std::vector of selected indices) be added as a hash here?
+  geo_hash[Group_Points].append(_select_from_viewport);
+  geo_hash[Group_Attributes].append(_select_from_viewport);
+
   // the local transform - must hash for transforms to work
   geo_hash[Group_Matrix].append(_local.a00);
   geo_hash[Group_Matrix].append(_local.a01);
@@ -238,7 +236,7 @@ void Outliner::geometry_engine(Scene& scene, GeometryList& out) {
     if (dynamic_cast<GeoOp*>(input(i))){
       GeoOp* op = input(i);
       op->get_geometry(scene, out);
-      // op->print_info(std::cout); // test
+      op->print_info(std::cout); // test
 
     }
   }
@@ -249,7 +247,7 @@ void Outliner::geometry_engine(Scene& scene, GeometryList& out) {
   for (unsigned o = 0; o < out.size(); o++) {
     GeoInfo& info = out[o];
     info.matrix = _local * info.matrix;
-    // info.print_info(std::cout); // test
+    info.print_info(std::cout); // test
   }
 
 }
@@ -367,8 +365,13 @@ void Outliner::select_geo_from_table(ViewerContext* ctx) {
   Box3 bbox = Box3(0, 0, 0);
 
   GeometryList& out = *scene_->object_list();
+  // if (out==NULL) { return; }
+
   for (unsigned o = 0; o <= out.size(); o++) {
     GeoInfo& info = out[o];
+
+  // if (info==NULL) { return; }
+
     if (!info.selectable) {
       continue;
     }
@@ -388,12 +391,11 @@ void Outliner::select_geo_from_table(ViewerContext* ctx) {
 }
 
 
-void Outliner::select_table_from_geo(ViewerContext* ctx) {
+void Outliner::select_table_from_viewport(ViewerContext* ctx) {
   Knob* tableKnob = knob("Table_knob");
   Table_KnobI* tk = tableKnob->tableKnob();
 
   tk->suspendKnobChangedEvents();
-  int sel_column = tk->getColumnIndex("selected");
 
   GeometryList& out = *scene_->object_list();
 
@@ -403,7 +405,6 @@ void Outliner::select_table_from_geo(ViewerContext* ctx) {
     GeoInfo& info = out[o];
     if (!info.selectable) { continue; }
 
-    tk->setCellBool(o, sel_column, info.selected);
     if (info.selected) {
       rows.push_back(int(o));
       set.insert(int(o));
@@ -449,21 +450,13 @@ bool Outliner::draw_indicators(ViewerContext* ctx) {
     select_geo_from_table(ctx);
   }
 
-
-  /*
-  DrawHandleType {
-    eDrawHandleAlways, eDrawHandleVertexSelection, eDrawHandleEdgeSelection, eDrawHandleFaceSelection,
-    eDrawHandleObjectSelection, eDrawHandleNodeSelection
-  }
-  */
-
   if (_select_from_viewport) {
-    select_table_from_geo(ctx);
+    select_table_from_viewport(ctx);
   }
 
 
   // if (_select_from_viewport) {
-  //   select_table_from_geo(ctx);
+  //   select_table_from_viewport(ctx);
   // } else {
   //   select_geo_from_table(ctx);
   // }
